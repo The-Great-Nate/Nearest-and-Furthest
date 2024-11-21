@@ -6,7 +6,11 @@
 
 double distance_sq, nearest_sq, nearest_wrap_sq, nearest, furthest_sq, furthest_wrap_sq, furthest;
 
-// Generate random points on each slot in points vector
+/**
+ * Generate random points using rng()
+ * @param[in] std::Vector of Vector2D points
+ * @param[in] int of size of vector input from command line
+*/
 void make_points(std::vector<Vector2D> &points, int size)
 {
     for (int i = 0; i < size; ++i)
@@ -15,19 +19,32 @@ void make_points(std::vector<Vector2D> &points, int size)
     }
 }
 
-void find_standard_nearest(std::vector<Vector2D> &points, int size, std::ofstream &near_obj, std::ofstream &far_obj)
+/**
+ * Finds nearest and furthest distances in vector of points in standard geometry
+ * @param[in] std::Vector of Vector2D points
+ * @param[in] int of size of vector input from command line
+ * @param[in] std::ofstream file object storing the nearest distances
+ * @param[in] std::ofstream file object storing the furthest distances
+*/
+void find_standard_distances(std::vector<Vector2D> &points, int size, std::ofstream &near_obj, std::ofstream &far_obj)
 {
+    // Vector that stores nearest and furthest distances to points. Only used for outputting average
     std::vector<double> nearests, furthests;
     nearests.reserve(size * 2);
     furthests.reserve(size * 2);
 
+    // Iterating over every point
     for (int i = 0; i < size; ++i)
     {
+        // Initialise nearest and furthest distances for each point
         distance_sq = 0;
         nearest_sq = std::numeric_limits<double>::infinity();
         furthest_sq = 0;
+        
+        // Iterating over adjacent points
         for (int j = 0; j < size; ++j)
         {
+            // If statement to prevent points from tracking distances with themselves.
             if (i != j)
             {
                 // Find distance between 2 points
@@ -37,25 +54,29 @@ void find_standard_nearest(std::vector<Vector2D> &points, int size, std::ofstrea
                 // Calculate the final distance with pythagoras
                 distance_sq = dx * dx + dy * dy;
 
+                // Check if distance squared is smaller than current stored nearest distance
                 if (distance_sq <= nearest_sq)
                 {
                     nearest_sq = distance_sq;
-                    points[i].SetStdNeighbour(&points[j]);
+                    points[i].SetWrapNeighbour(&points[j]);
                 }
 
+                // Check if distance squared is bigger than current stored furthest distance
                 if (distance_sq >= furthest_sq)
                 {
                     furthest_sq = distance_sq;
-                    points[i].SetStdFaraway(&points[j]);
+                    points[i].SetWrapFaraway(&points[j]);
                 }
             }
         }
 
+        // Store nearest and furthest distances into respective vectors of distances
         nearest = std::sqrt(nearest_sq);
         furthest = std::sqrt(furthest_sq);
         nearests.push_back(nearest);
         furthests.push_back(furthest);
 
+        // Store each distance in their respective files
         if (near_obj.is_open())
         {
             near_obj << nearest << "\n";
@@ -67,29 +88,52 @@ void find_standard_nearest(std::vector<Vector2D> &points, int size, std::ofstrea
         }
     }
 
+    // Calculate the average furthest and nearest distance.
     double avrg_nearest = 0;
     double avrg_furthest = 0;
+
+    // Summing all distances
     for (int i = 0; i < size * 2; i++)
     {
         avrg_nearest += nearests[i];
         avrg_furthest += furthests[i];
     }
+
+    // Averaging distances by size of vectors (which is size * 2 due to double calculations of distances sadly)
     avrg_nearest /= size * 2;
     avrg_furthest /= size * 2;
 
+    // Output averages
     std::cout << "Average Nearest Std' Distance: " << avrg_nearest << "\n"
               << "Average Furthest Std' Distance: " << avrg_furthest << std::endl;
 }
 
-void find_wrapped_nearest(std::vector<Vector2D> &points, int size)
+/**
+ * Finds nearest and furthest distances in vector of points in wrap around geometry
+ * @param[in] std::Vector of Vector2D points
+ * @param[in] int of size of vector input from command line
+ * @param[in] std::ofstream file object storing the nearest distances
+ * @param[in] std::ofstream file object storing the furthest distances
+*/
+void find_wrapped_distances(std::vector<Vector2D> &points, int size, std::ofstream &near_obj, std::ofstream &far_obj)
 {
+    // Vector that stores nearest and furthest distances to points. Only used for outputting average
+    std::vector<double> nearests, furthests;
+    nearests.reserve(size * 2);
+    furthests.reserve(size * 2);
+
+    // Iterating over every point
     for (int i = 0; i < size; ++i)
     {
+        // Initialise nearest and furthest distances for each point
         distance_sq = 0;
         nearest_sq = std::numeric_limits<double>::infinity();
-        nearest_wrap_sq = std::numeric_limits<double>::infinity();
+        furthest_sq = 0;
+
+        // Iterating over adjacent points
         for (int j = 0; j < size; ++j)
         {
+            // If statement to prevent points from tracking distances with themselves.
             if (i != j)
             {
                 // Find distance between 2 points
@@ -107,15 +151,58 @@ void find_wrapped_nearest(std::vector<Vector2D> &points, int size)
                 // Calculate the final distance with pythagoras
                 distance_sq = dx * dx + dy * dy;
 
+                // Check if distance squared is smaller than current stored nearest distance
                 if (distance_sq <= nearest_sq)
                 {
                     nearest_sq = distance_sq;
                     points[i].SetStdNeighbour(&points[j]);
-                    points[i].SetWrapNeighbour(&points[j]);
+                }
+
+                // Check if distance squared is bigger than current stored furthest distance
+                if (distance_sq >= furthest_sq)
+                {
+                    furthest_sq = distance_sq;
+                    points[i].SetStdFaraway(&points[j]);
                 }
             }
         }
+
+        // Store nearest and furthest distances into respective vectors of distances
+        nearest = std::sqrt(nearest_sq);
+        furthest = std::sqrt(furthest_sq);
+        nearests.push_back(nearest);
+        furthests.push_back(furthest);
+
+        // Store each distance in their respective files
+        if (near_obj.is_open())
+        {
+            near_obj << nearest << "\n";
+        }
+
+        if (far_obj.is_open())
+        {
+            far_obj << furthest << "\n";
+        }
     }
+
+    // Calculate the average furthest and nearest distance.
+    double avrg_nearest = 0;
+    double avrg_furthest = 0;
+
+    // Summing all distances
+    for (int i = 0; i < size * 2; i++)
+    {
+        avrg_nearest += nearests[i];
+        avrg_furthest += furthests[i];
+    }
+
+    // Averaging distances by size of vectors (which is size * 2 due to double calculations of distances sadly)
+    avrg_nearest /= size * 2;
+    avrg_furthest /= size * 2;
+
+    // Output averages
+    std::cout << "Average Nearest Wrapped Distance: " << avrg_nearest << "\n"
+              << "Average Furthest Wrapped Distance: " << avrg_furthest << std::endl;
 }
 
 // main
@@ -133,12 +220,19 @@ int main(int argc, char **argv)
     std::vector<Vector2D> points;
     points.reserve(size); // Reserve space for vector in memory
 
+    auto start_generating = std::chrono::high_resolution_clock::now();
     init_rng();                // Initialise rng
     make_points(points, size); // Generate the points
+    auto stop_generating = std::chrono::high_resolution_clock::now();
+    auto duration_generating = std::chrono::duration_cast<std::chrono::seconds>(stop_generating - start_generating);
+    auto minutes_generating = std::chrono::duration_cast<std::chrono::minutes>(duration_generating);
+    auto seconds_generating = duration_generating - minutes_generating;
 
     std::ofstream nearest_std_file, furthest_std_file, nearest_wrap_file, furthest_wrap_file;
-    nearest_std_file.open("data\\nearest_distances.txt");
-    furthest_std_file.open("data\\furthest_distances.txt");
+    nearest_std_file.open("data\\nearest_std_distances.txt");
+    furthest_std_file.open("data\\furthest_std_distances.txt");
+    nearest_wrap_file.open("data\\nearest_wrapped_distances.txt");
+    furthest_wrap_file.open("data\\furthest_wrapped_distances.txt");
 
     // for debugging :D
     /*
@@ -150,18 +244,22 @@ int main(int argc, char **argv)
 
     // Start the clock for how long this simulation takes to run
     auto start_nearest = std::chrono::high_resolution_clock::now();
-    find_standard_nearest(points, size, nearest_std_file, furthest_std_file);
+    find_standard_distances(points, size, nearest_std_file, furthest_std_file);
+    find_wrapped_distances(points, size, nearest_wrap_file, furthest_wrap_file);
 
     // Stop the clock for how long this simulation takes to run
     auto end_nearest = std::chrono::high_resolution_clock::now();
     auto duration_nearest = std::chrono::duration_cast<std::chrono::seconds>(end_nearest - start_nearest);
-    auto minutes = std::chrono::duration_cast<std::chrono::minutes>(duration_nearest);
-    auto seconds = duration_nearest - minutes;
+    auto minutes_nearest = std::chrono::duration_cast<std::chrono::minutes>(duration_nearest);
+    auto seconds_nearest = duration_nearest - minutes_nearest;
 
-    std::cout << "Simulation Runtime " << minutes.count() << ":" << seconds.count() << " (MM:ss) \n";
-    nearest_std_file << "duration=" << minutes.count() << ":" << seconds.count() << "\n";
-    furthest_std_file << "duration=" << minutes.count() << ":" << seconds.count() << "\n";
+    std::cout << "------------------------------------------------" << std::endl;
 
+    // Output time to generate points and general simulation run time to console
+    std::cout << "Generation Runtime " << minutes_generating.count() << ":" << seconds_generating.count() << " (MM:ss) \n";
+    std::cout << "Simulation Runtime " << minutes_nearest.count() << ":" << seconds_nearest.count() << " (MM:ss) \n";
+    
+    // Close files
     nearest_std_file.close();
     furthest_std_file.close();
 
