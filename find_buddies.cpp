@@ -39,6 +39,7 @@ std::vector<Vector2D> make_points(std::string location)
     {
         // Output error message if file can't be opened
         std::cerr << "Error opening file!" << std::endl;
+        std::terminate();
     }
 
     // Create vector of lines in csv & output string for splitting (via std::getline)
@@ -95,6 +96,7 @@ std::vector<Vector2D> make_points(std::string location)
                         std::cerr << "Invalid values at line " << i + 1 << ": "
                                   << "x = " << x << ", y = " << y << "\n"
                                   << "Only values between 0 and 1 inclusive allowed!" << std::endl;
+                        std::terminate();
                     }
                 }
             }
@@ -138,7 +140,6 @@ std::vector<Vector2D> make_points(int size)
  */
 void find_standard_distances(std::vector<Vector2D> &points, int size, std::ofstream &near_obj, std::ofstream &far_obj)
 {
-     
     std::vector<double> nearests, furthests; // Vector that stores nearest and furthest distances to points. Only used for outputting average
     nearests.reserve(size * 2);
     furthests.reserve(size * 2);
@@ -189,7 +190,6 @@ void find_standard_distances(std::vector<Vector2D> &points, int size, std::ofstr
                     }
                 }
             }
-
             // Store nearest and furthest distances into respective vectors of distances
             nearest = std::sqrt(nearest_sq);
             furthest = std::sqrt(furthest_sq);
@@ -239,9 +239,9 @@ void find_standard_distances(std::vector<Vector2D> &points, int size, std::ofstr
     avrg_nearest /= size * 2;
     avrg_furthest /= size * 2;
 
-    // Output averages
-    std::cout << "Average Nearest Wraparound' Distance: " << avrg_nearest << "\n"
-              << "Average Furthest Wraparound' Distance: " << avrg_furthest << std::endl;
+    // Output averages to console as requested
+    std::cout << "Average Nearest Std' Distance: " << avrg_nearest << "\n"
+              << "Average Furthest Std' Distance: " << avrg_furthest << std::endl;
 }
 
 /**
@@ -361,9 +361,9 @@ void find_wrapped_distances(std::vector<Vector2D> &points, int size, std::ofstre
     avrg_nearest /= size * 2;
     avrg_furthest /= size * 2;
 
-    // Output averages
-    std::cout << "Average Nearest Std' Distance: " << avrg_nearest << "\n"
-              << "Average Furthest Std' Distance: " << avrg_furthest << std::endl;
+    // Output averages to console as requested
+    std::cout << "Average Nearest Wraparound' Distance: " << avrg_nearest << "\n"
+              << "Average Furthest Wraparound' Distance: " << avrg_furthest << std::endl;
 }
 
 // main
@@ -372,7 +372,7 @@ int main(int argc, char **argv)
     // checks if user provided enough arguments in command line
     if (argc < 3)
     {
-        std::cerr << "Please provide the (number of points || file path) & number of threads to use as a command line argument." << std::endl;
+        std::cerr << "Please provide the (number of points || file path),  number of threads to use as a command line argument." << std::endl;
         return EXIT_FAILURE;
     }
 
@@ -381,9 +381,9 @@ int main(int argc, char **argv)
     std::vector<Vector2D> points;
     std::chrono::microseconds duration_generating;
     std::string gen_method;
-      
+    
     // Check if first cmd argument is file path or integer
-    if (is_path(std::to_string(atoi(argv[1]))))
+    if (!is_path(std::to_string(atoi(argv[1]))))
     { // If arg is int (not path)
         // Sets size of points vector based on command line argument
         size = atoi(argv[1]);
@@ -393,18 +393,20 @@ int main(int argc, char **argv)
         points = make_points(size); // Generate the points
         auto stop_generating = std::chrono::high_resolution_clock::now();
         auto duration_generating = std::chrono::duration_cast<std::chrono::microseconds>(stop_generating - start_generating);
-        gen_method = "random";
+        gen_method = "random of size: " + std::to_string(size);
         
     }
     else
     {
         // Start reading file of points and benchmark performance
         auto start_generating = std::chrono::high_resolution_clock::now();
-        points = make_points(std::to_string(atoi(argv[1])));
+        points = make_points(argv[1]);
         auto stop_generating = std::chrono::high_resolution_clock::now();
         auto duration_generating = std::chrono::duration_cast<std::chrono::microseconds>(stop_generating - start_generating);
         gen_method = "file of size: " + std::to_string(points.size());
+        size = points.size();
     }
+
 
     // Assign no. of threads to use based on command line argument
     int numThreads = atoi(argv[2]);
@@ -448,7 +450,7 @@ int main(int argc, char **argv)
     std::ofstream static_times("runtimes\\simulation_static.txt", std::ios::app);
     // std::ofstream parallel_times("runtimes\\simulation_parallel.txt", std::ios::app);
 
-    gen_times << numThreads << "\t" << duration_generating.count() << std::endl;
+    gen_times << numThreads << "\t" << duration_generating.count() << "\t" << gen_method << std::endl;
 
     static_times << numThreads << "\t" << duration_nearest.count() << std::endl;
 
