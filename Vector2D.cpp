@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cmath>
+#include "Vector2D.hpp"
 
 class Vector2D
 {
