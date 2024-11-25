@@ -9,7 +9,7 @@ std::default_random_engine generator;
 /**
  * Random number generator initialiser for generating random points
  */
-void init_rng()
+void initRng()
 {
     // Initialise a clock object
     typedef std::chrono::high_resolution_clock myclock;

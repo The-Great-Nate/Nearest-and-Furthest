@@ -6,7 +6,7 @@
 
 extern std::default_random_engine generator;
 
-void init_rng();
+void initRng();
 double rng();
 
 #endif
