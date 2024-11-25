@@ -2,6 +2,7 @@
 #include <fstream>
 #include <sstream>
 #include <chrono>
+#include <thread>
 #include "Vector2D.cpp"
 #include "rng.cpp"
 #include <omp.h>
@@ -10,7 +11,7 @@
  * Check if inputted argument is a file_path (string) or requested number of points to generate (int).
  * @param[in] std::string command line argument
  */
-bool is_path(const std::string &str)
+bool isPath(const std::string &str)
 {
     for (char c : str)
     {
@@ -115,14 +116,14 @@ std::vector<Vector2D> make_points(int size)
     std::vector<Vector2D> points; // Vector of points
 #pragma omp parallel
     {
-        std::vector<Vector2D> local_points;  // Local vector for each thread
+        std::vector<Vector2D> local_points; // Local vector for each thread
 #pragma omp parallel for schedule(static)
         for (int i = 0; i < size; ++i)
         {
             local_points.push_back(Vector2D(rng(), rng())); // Add point to points vector based on rng
         }
 
-        #pragma omp critical
+#pragma omp critical
         {
             // Once thread completes work, append its local vector to the main vector
             points.insert(points.end(), local_points.begin(), local_points.end());
@@ -138,7 +139,7 @@ std::vector<Vector2D> make_points(int size)
  * @param[in] std::ofstream file object storing the nearest distances
  * @param[in] std::ofstream file object storing the furthest distances
  */
-void find_standard_distances(std::vector<Vector2D> &points, int size, std::ofstream &near_obj, std::ofstream &far_obj)
+void findStandardDistances(std::vector<Vector2D> &points, int size, std::ofstream &near_obj, std::ofstream &far_obj)
 {
     std::vector<double> nearests, furthests; // Vector that stores nearest and furthest distances to points. Only used for outputting average
     nearests.reserve(size * 2);
@@ -169,8 +170,8 @@ void find_standard_distances(std::vector<Vector2D> &points, int size, std::ofstr
                 if (i != j)
                 {
                     // Find distance between 2 points
-                    double dx = std::abs(points[j].GetX() - points[i].GetX());
-                    double dy = std::abs(points[j].GetY() - points[i].GetY());
+                    double dx = std::abs(points[j].getX() - points[i].getX());
+                    double dy = std::abs(points[j].getY() - points[i].getY());
 
                     // Calculate the final distance with pythagoras
                     distance_sq = dx * dx + dy * dy;
@@ -179,14 +180,14 @@ void find_standard_distances(std::vector<Vector2D> &points, int size, std::ofstr
                     if (distance_sq <= nearest_sq)
                     {
                         nearest_sq = distance_sq;
-                        points[i].SetWrapNeighbour(&points[j]);
+                        points[i].setWrapNeighbour(&points[j]);
                     }
 
                     // Check if distance squared is bigger than current stored furthest distance
                     if (distance_sq >= furthest_sq)
                     {
                         furthest_sq = distance_sq;
-                        points[i].SetWrapFaraway(&points[j]);
+                        points[i].setWrapFaraway(&points[j]);
                     }
                 }
             }
@@ -240,8 +241,15 @@ void find_standard_distances(std::vector<Vector2D> &points, int size, std::ofstr
     avrg_furthest /= size * 2;
 
     // Output averages to console as requested
-    std::cout << "Average Nearest Std' Distance: " << avrg_nearest << "\n"
-              << "Average Furthest Std' Distance: " << avrg_furthest << std::endl;
+#pragma omp barrier
+#pragma omp single
+    {
+        // Output averages to console as requested
+        std::cout << "Average Nearest Standard' Distance: " << avrg_nearest << "\n"
+                  << "Average Furthest Standard' Distance: " << avrg_furthest << std::endl;
+        near_obj << "Average Nearest Distance\t" << avrg_nearest;
+        far_obj << "Average furthest Distance\t" << avrg_furthest;
+    }
 }
 
 /**
@@ -251,11 +259,12 @@ void find_standard_distances(std::vector<Vector2D> &points, int size, std::ofstr
  * @param[in] std::ofstream file object storing the nearest distances
  * @param[in] std::ofstream file object storing the furthest distances
  */
-void find_wrapped_distances(std::vector<Vector2D> &points, int size, std::ofstream &near_obj, std::ofstream &far_obj)
+void findWrappedDistances(std::vector<Vector2D> &points, int size, std::ofstream &near_obj, std::ofstream &far_obj)
 {
     std::vector<double> nearests, furthests; // Vector that stores nearest and furthest distances to points. Only used for outputting average
     nearests.reserve(size * 2);
     furthests.reserve(size * 2);
+    bool output_avrg = false;
 #pragma omp parallel
     {
         // Vector that stores nearest and furthest distances to points. Only used for outputting average
@@ -282,8 +291,8 @@ void find_wrapped_distances(std::vector<Vector2D> &points, int size, std::ofstre
                 if (i != j)
                 {
                     // Find distance between 2 points
-                    double dx = std::abs(points[j].GetX() - points[i].GetX());
-                    double dy = std::abs(points[j].GetY() - points[i].GetY());
+                    double dx = std::abs(points[j].getX() - points[i].getX());
+                    double dy = std::abs(points[j].getY() - points[i].getY());
 
                     // Checking if wrapping around is worth it.
                     // If x or y is over 0.5 apart, wrap it around
@@ -300,14 +309,14 @@ void find_wrapped_distances(std::vector<Vector2D> &points, int size, std::ofstre
                     if (distance_sq <= nearest_sq)
                     {
                         nearest_sq = distance_sq;
-                        points[i].SetStdNeighbour(&points[j]);
+                        points[i].setStdNeighbour(&points[j]);
                     }
 
                     // Check if distance squared is bigger than current stored furthest distance
                     if (distance_sq >= furthest_sq)
                     {
                         furthest_sq = distance_sq;
-                        points[i].SetStdFaraway(&points[j]);
+                        points[i].setStdFaraway(&points[j]);
                     }
                 }
             }
@@ -361,9 +370,15 @@ void find_wrapped_distances(std::vector<Vector2D> &points, int size, std::ofstre
     avrg_nearest /= size * 2;
     avrg_furthest /= size * 2;
 
-    // Output averages to console as requested
-    std::cout << "Average Nearest Wraparound' Distance: " << avrg_nearest << "\n"
-              << "Average Furthest Wraparound' Distance: " << avrg_furthest << std::endl;
+if (output_avrg == false)
+    {
+        output_avrg = true;
+        // Output averages to console as requested
+        std::cout << "Average Nearest Wraparound' Distance: " << avrg_nearest << "\n"
+                  << "Average Furthest Wraparound' Distance: " << avrg_furthest << std::endl;
+        near_obj << "Average Nearest Distance\t" << avrg_nearest;
+        far_obj << "Average furthest Distance\t" << avrg_furthest;
+    }
 }
 
 // main
@@ -372,7 +387,7 @@ int main(int argc, char **argv)
     // checks if user provided enough arguments in command line
     if (argc < 3)
     {
-        std::cerr << "Please provide the (number of points || file path),  number of threads to use as a command line argument." << std::endl;
+        std::cerr << "Please provide the (number of points || file path),  number of threads to use and scheduling type (all || partitioned) as a command line argument." << std::endl;
         return EXIT_FAILURE;
     }
 
@@ -381,20 +396,21 @@ int main(int argc, char **argv)
     std::vector<Vector2D> points;
     std::chrono::microseconds duration_generating;
     std::string gen_method;
-    
+    std::string schedule_method = argv[3];
+
     // Check if first cmd argument is file path or integer
-    if (!is_path(std::to_string(atoi(argv[1]))))
+    if (!isPath(std::to_string(atoi(argv[1]))))
     { // If arg is int (not path)
         // Sets size of points vector based on command line argument
         size = atoi(argv[1]);
         // Start generating points and benchmark performance
         auto start_generating = std::chrono::high_resolution_clock::now();
-        init_rng();                // Initialise rng
+        initRng();                 // Initialise rng
         points = make_points(size); // Generate the points
+        points.reserve(size);
         auto stop_generating = std::chrono::high_resolution_clock::now();
         auto duration_generating = std::chrono::duration_cast<std::chrono::microseconds>(stop_generating - start_generating);
         gen_method = "random of size: " + std::to_string(size);
-        
     }
     else
     {
@@ -407,32 +423,54 @@ int main(int argc, char **argv)
         size = points.size();
     }
 
-
     // Assign no. of threads to use based on command line argument
-    int numThreads = atoi(argv[2]);
-    omp_set_num_threads(numThreads);
+    int num_threads = atoi(argv[2]);
+    omp_set_num_threads(num_threads);
 
     std::ofstream nearest_std_file, furthest_std_file, nearest_wrap_file, furthest_wrap_file;
-    nearest_std_file.open("data\\nearest_std_distances.txt");
-    furthest_std_file.open("data\\furthest_std_distances.txt");
-    nearest_wrap_file.open("data\\nearest_wrapped_distances.txt");
-    furthest_wrap_file.open("data\\furthest_wrapped_distances.txt");
+    nearest_std_file.open("data\\" + std::to_string(num_threads) + "_nearest_std_distances_" + schedule_method + ".txt");
+    furthest_std_file.open("data\\" + std::to_string(num_threads) + "_furthest_std_distances_" + schedule_method + ".txt");
+    nearest_wrap_file.open("data\\" + std::to_string(num_threads) + "_nearest_wrapped_distances_" + schedule_method + ".txt");
+    furthest_wrap_file.open("data\\" + std::to_string(num_threads) + "_furthest_wrapped_distances_" + schedule_method + ".txt");
 
     // for debugging :D (output points)
     /*
     for (int i = 0; i < size; ++i)
     {
-        std::cout << "Point: (" << points[i].GetX() << ", " << points[i].GetY() << ")" << std::endl;
+        std::cout << "Point: (" << points[i].getX() << ", " << points[i].getY() << ")" << std::endl;
     }
     */
 
-    std::cout << "----------  Thread Count: " << numThreads << "  ----------" << std::endl;
+    std::cout << "----------  Thread Count: " << num_threads << "  ----------" << std::endl;
+
     // Start benchmark performance
     auto start_nearest = std::chrono::high_resolution_clock::now();
-
-    // Run the distance calculations
-    find_standard_distances(points, size, nearest_std_file, furthest_std_file);
-    find_wrapped_distances(points, size, nearest_wrap_file, furthest_wrap_file);
+    if (schedule_method == "all")
+    {
+        // All - uses all available threads to run both functions sequentially
+        // Run the distance calculations
+        findStandardDistances(points, size, nearest_std_file, furthest_std_file);
+        findWrappedDistances(points, size, nearest_wrap_file, furthest_wrap_file);
+    }
+    else if (schedule_method == "partitioned")
+    {
+        // Partitioned - allocates a portion of threads to both functions concurrently
+        // For partitioned scheduling to work, nesting must be enabled to maintain private variable logic between threads
+        omp_set_nested(true);
+#pragma omp parallel sections
+        {
+            // Run the distance calculations concurrently using available threads
+#pragma omp section
+            {
+                findStandardDistances(points, size, nearest_std_file, furthest_std_file);
+            }
+#pragma omp section
+            {
+                findWrappedDistances(points, size, nearest_wrap_file, furthest_wrap_file);
+            }
+            
+        }
+    }
 
     // Stop benchmark performance
     auto end_nearest = std::chrono::high_resolution_clock::now();
@@ -440,25 +478,26 @@ int main(int argc, char **argv)
     auto minutes_nearest = std::chrono::duration_cast<std::chrono::minutes>(duration_nearest);
     auto seconds_nearest = duration_nearest - minutes_nearest;
 
+    std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Used to prevent incorrect console writing sequences
     std::cout << "------------------------------------------" << std::endl;
 
     // Output time to generate points and general simulation run time to console
     std::cout << "Generation Runtime " << duration_generating.count() << " microseconds \n";
     std::cout << "Simulation Runtime " << minutes_nearest.count() << ":" << seconds_nearest.count() << " (MM:ss) \n";
 
+    // Write times into files for later analysis
     std::ofstream gen_times("runtimes\\generation.txt", std::ios::app);
-    std::ofstream static_times("runtimes\\simulation_static.txt", std::ios::app);
-    // std::ofstream parallel_times("runtimes\\simulation_parallel.txt", std::ios::app);
-
-    gen_times << numThreads << "\t" << duration_generating.count() << "\t" << gen_method << std::endl;
-
-    static_times << numThreads << "\t" << duration_nearest.count() << std::endl;
+    std::ofstream schedule_times("runtimes\\schedule_" + schedule_method + ".txt", std::ios::app);
+    gen_times << num_threads << "\t" << duration_generating.count() << "\t" << gen_method << std::endl;
+    schedule_times << num_threads << "\t" << duration_nearest.count() << std::endl;
 
     // Close files
     nearest_std_file.close();
     furthest_std_file.close();
+    nearest_wrap_file.close();
+    furthest_wrap_file.close();
     gen_times.close();
-    static_times.close();
+    schedule_times.close();
 
     return EXIT_SUCCESS;
 }
