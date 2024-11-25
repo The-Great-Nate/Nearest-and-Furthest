@@ -139,7 +139,7 @@ std::vector<Vector2D> make_points(int size)
  * @param[in] std::ofstream file object storing the nearest distances
  * @param[in] std::ofstream file object storing the furthest distances
  */
-void findStandardDistances(std::vector<Vector2D> &points, int size, std::ofstream &near_obj, std::ofstream &far_obj)
+void findStandardDistances(std::vector<Vector2D> &points, int size, std::ofstream &near_obj, std::ofstream &far_obj, std::ofstream &averages)
 {
     std::vector<double> nearests, furthests; // Vector that stores nearest and furthest distances to points. Only used for outputting average
     nearests.reserve(size * 2);
@@ -247,8 +247,7 @@ void findStandardDistances(std::vector<Vector2D> &points, int size, std::ofstrea
         // Output averages to console as requested
         std::cout << "Average Nearest Standard' Distance: " << avrg_nearest << "\n"
                   << "Average Furthest Standard' Distance: " << avrg_furthest << std::endl;
-        near_obj << "Average Nearest Distance\t" << avrg_nearest;
-        far_obj << "Average furthest Distance\t" << avrg_furthest;
+        averages << avrg_nearest << "\tnearest std\n" << avrg_furthest << "\tfurthest std\n";
     }
 }
 
@@ -259,7 +258,7 @@ void findStandardDistances(std::vector<Vector2D> &points, int size, std::ofstrea
  * @param[in] std::ofstream file object storing the nearest distances
  * @param[in] std::ofstream file object storing the furthest distances
  */
-void findWrappedDistances(std::vector<Vector2D> &points, int size, std::ofstream &near_obj, std::ofstream &far_obj)
+void findWrappedDistances(std::vector<Vector2D> &points, int size, std::ofstream &near_obj, std::ofstream &far_obj, std::ofstream &averages)
 {
     std::vector<double> nearests, furthests; // Vector that stores nearest and furthest distances to points. Only used for outputting average
     nearests.reserve(size * 2);
@@ -376,8 +375,7 @@ if (output_avrg == false)
         // Output averages to console as requested
         std::cout << "Average Nearest Wraparound' Distance: " << avrg_nearest << "\n"
                   << "Average Furthest Wraparound' Distance: " << avrg_furthest << std::endl;
-        near_obj << "Average Nearest Distance\t" << avrg_nearest;
-        far_obj << "Average furthest Distance\t" << avrg_furthest;
+        averages << avrg_nearest << "\tnearest wraparound\n" << avrg_furthest << "\tfurthest wraparound\n";
     }
 }
 
@@ -433,6 +431,10 @@ int main(int argc, char **argv)
     nearest_wrap_file.open("data\\" + std::to_string(num_threads) + "_nearest_wrapped_distances_" + schedule_method + ".txt");
     furthest_wrap_file.open("data\\" + std::to_string(num_threads) + "_furthest_wrapped_distances_" + schedule_method + ".txt");
 
+    // File to store the averages
+    std::ofstream averages("averages.txt", std::ios::app);
+
+
     // for debugging :D (output points)
     /*
     for (int i = 0; i < size; ++i)
@@ -449,8 +451,8 @@ int main(int argc, char **argv)
     {
         // All - uses all available threads to run both functions sequentially
         // Run the distance calculations
-        findStandardDistances(points, size, nearest_std_file, furthest_std_file);
-        findWrappedDistances(points, size, nearest_wrap_file, furthest_wrap_file);
+        findStandardDistances(points, size, nearest_std_file, furthest_std_file, averages);
+        findWrappedDistances(points, size, nearest_wrap_file, furthest_wrap_file, averages);
     }
     else if (schedule_method == "partitioned")
     {
@@ -462,11 +464,11 @@ int main(int argc, char **argv)
             // Run the distance calculations concurrently using available threads
 #pragma omp section
             {
-                findStandardDistances(points, size, nearest_std_file, furthest_std_file);
+                findStandardDistances(points, size, nearest_std_file, furthest_std_file, averages);
             }
 #pragma omp section
             {
-                findWrappedDistances(points, size, nearest_wrap_file, furthest_wrap_file);
+                findWrappedDistances(points, size, nearest_wrap_file, furthest_wrap_file, averages);
             }
             
         }
@@ -498,6 +500,7 @@ int main(int argc, char **argv)
     furthest_wrap_file.close();
     gen_times.close();
     schedule_times.close();
+    averages.close();
 
     return EXIT_SUCCESS;
 }
