@@ -224,12 +224,12 @@ void findStandardDistances(std::vector<Vector2D> &points, int size, std::ofstrea
     // Calculate the average furthest and nearest distance.
     double avrg_nearest = 0;
     double avrg_furthest = 0;
-
+#pragma omp barrier
 #pragma omp parallel
     {
 // Summing all distances
 #pragma omp parallel for reduction(+ : avrg_nearest, avrg_furthest) schedule(static) // Privatise avrg_nearest & avrg_furthest and then combine private copies with + operation
-        for (int i = 0; i < size * 2; i++)
+        for (int i = 0; i < nearests.size(); i++)
         {
             avrg_nearest += nearests[i];
             avrg_furthest += furthests[i];
@@ -237,11 +237,11 @@ void findStandardDistances(std::vector<Vector2D> &points, int size, std::ofstrea
     }
 
     // Averaging distances by size of vectors (which is size * 2 due to double calculations of distances sadly)
-    avrg_nearest /= size * 2;
-    avrg_furthest /= size * 2;
+    avrg_nearest /= nearests.size();
+    avrg_furthest /= furthests.size();
 
     // Output averages to console as requested
-#pragma omp barrier
+
 #pragma omp single
     {
         // Output averages to console as requested
@@ -353,12 +353,12 @@ void findWrappedDistances(std::vector<Vector2D> &points, int size, std::ofstream
     // Calculate the average furthest and nearest distance.
     double avrg_nearest = 0;
     double avrg_furthest = 0;
-
+#pragma omp barrier
 #pragma omp parallel
     {
 // Summing all distances
 #pragma omp parallel for reduction(+ : avrg_nearest, avrg_furthest) schedule(static)
-        for (int i = 0; i < size * 2; i++)
+        for (int i = 0; i < nearests.size(); i++)
         {
             avrg_nearest += nearests[i];
             avrg_furthest += furthests[i];
@@ -366,8 +366,8 @@ void findWrappedDistances(std::vector<Vector2D> &points, int size, std::ofstream
     }
 
     // Averaging distances by size of vectors (which is size * 2 due to double calculations of distances sadly)
-    avrg_nearest /= size * 2;
-    avrg_furthest /= size * 2;
+    avrg_nearest /= nearests.size();
+    avrg_furthest /= furthests.size();
 
 if (output_avrg == false)
     {
