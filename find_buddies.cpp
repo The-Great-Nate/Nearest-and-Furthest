@@ -11,7 +11,7 @@
  * Check if inputted argument is a file_path (string) or requested number of points to generate (int).
  * @param[in] std::string command line argument
  */
-bool isPath(const std::string &str)
+bool isNotPath(const std::string &str)
 {
     for (char c : str)
     {
@@ -117,18 +117,18 @@ std::vector<Vector2D> make_points(int size)
 #pragma omp parallel
     {
         std::vector<Vector2D> local_points; // Local vector for each thread
-#pragma omp parallel for schedule(static)
+#pragma omp for schedule(static)
         for (int i = 0; i < size; ++i)
         {
             local_points.push_back(Vector2D(rng(), rng())); // Add point to points vector based on rng
         }
 
 #pragma omp critical
-        {
+        
             // Once thread completes work, append its local vector to the main vector
             points.insert(points.end(), local_points.begin(), local_points.end());
         }
-    }
+    
     return points;
 }
 
@@ -142,15 +142,11 @@ std::vector<Vector2D> make_points(int size)
 void findStandardDistances(std::vector<Vector2D> &points, int size, std::ofstream &near_obj, std::ofstream &far_obj, std::ofstream &averages)
 {
     std::vector<double> nearests, furthests; // Vector that stores nearest and furthest distances to points. Only used for outputting average
-    nearests.reserve(size * 2);
-    furthests.reserve(size * 2);
+    bool output_avrg = false;
 #pragma omp parallel
     {
         // Vector that stores nearest and furthest distances to points. Only used for outputting average
         std::vector<double> local_nearests, local_furthests;
-        int local_size = size / omp_get_num_threads() + 10; // Reserve space for the points handled by this thread (add 10 in case of rounding problems with odd no. threads)
-        local_nearests.reserve(local_size);
-        local_furthests.reserve(local_size);
 
 #pragma omp for schedule(static)
         // Iterating over every point
@@ -177,17 +173,15 @@ void findStandardDistances(std::vector<Vector2D> &points, int size, std::ofstrea
                     distance_sq = dx * dx + dy * dy;
 
                     // Check if distance squared is smaller than current stored nearest distance
-                    if (distance_sq <= nearest_sq)
+                    if (distance_sq < nearest_sq)
                     {
                         nearest_sq = distance_sq;
-                        points[i].setWrapNeighbour(&points[j]);
                     }
 
                     // Check if distance squared is bigger than current stored furthest distance
-                    if (distance_sq >= furthest_sq)
+                    if (distance_sq > furthest_sq)
                     {
                         furthest_sq = distance_sq;
-                        points[i].setWrapFaraway(&points[j]);
                     }
                 }
             }
@@ -228,7 +222,7 @@ void findStandardDistances(std::vector<Vector2D> &points, int size, std::ofstrea
 #pragma omp parallel
     {
 // Summing all distances
-#pragma omp parallel for reduction(+ : avrg_nearest, avrg_furthest) schedule(static) // Privatise avrg_nearest & avrg_furthest and then combine private copies with + operation
+#pragma omp for reduction(+ : avrg_nearest, avrg_furthest) schedule(static) // Privatise avrg_nearest & avrg_furthest and then combine private copies with + operation
         for (int i = 0; i < nearests.size(); i++)
         {
             avrg_nearest += nearests[i];
@@ -242,8 +236,9 @@ void findStandardDistances(std::vector<Vector2D> &points, int size, std::ofstrea
 
     // Output averages to console as requested
 
-#pragma omp single
+if (output_avrg == false)
     {
+        output_avrg = true;
         // Output averages to console as requested
         std::cout << "Average Nearest Standard' Distance: " << avrg_nearest << "\n"
                   << "Average Furthest Standard' Distance: " << avrg_furthest << std::endl;
@@ -261,16 +256,13 @@ void findStandardDistances(std::vector<Vector2D> &points, int size, std::ofstrea
 void findWrappedDistances(std::vector<Vector2D> &points, int size, std::ofstream &near_obj, std::ofstream &far_obj, std::ofstream &averages)
 {
     std::vector<double> nearests, furthests; // Vector that stores nearest and furthest distances to points. Only used for outputting average
-    nearests.reserve(size * 2);
-    furthests.reserve(size * 2);
+
     bool output_avrg = false;
 #pragma omp parallel
     {
         // Vector that stores nearest and furthest distances to points. Only used for outputting average
         std::vector<double> local_nearests, local_furthests;
-        int local_size = size / omp_get_num_threads() + 10; // Reserve space for the points handled by this thread (add 10 in case of rounding problems with odd no. threads)
-        local_nearests.reserve(local_size);
-        local_furthests.reserve(local_size);
+
 
 #pragma omp for schedule(static)
         // Iterating over every point
@@ -305,17 +297,15 @@ void findWrappedDistances(std::vector<Vector2D> &points, int size, std::ofstream
                     distance_sq = dx * dx + dy * dy;
 
                     // Check if distance squared is smaller than current stored nearest distance
-                    if (distance_sq <= nearest_sq)
+                    if (distance_sq < nearest_sq)
                     {
                         nearest_sq = distance_sq;
-                        points[i].setStdNeighbour(&points[j]);
                     }
 
                     // Check if distance squared is bigger than current stored furthest distance
-                    if (distance_sq >= furthest_sq)
+                    if (distance_sq > furthest_sq)
                     {
                         furthest_sq = distance_sq;
-                        points[i].setStdFaraway(&points[j]);
                     }
                 }
             }
@@ -357,7 +347,7 @@ void findWrappedDistances(std::vector<Vector2D> &points, int size, std::ofstream
 #pragma omp parallel
     {
 // Summing all distances
-#pragma omp parallel for reduction(+ : avrg_nearest, avrg_furthest) schedule(static)
+#pragma omp for reduction(+ : avrg_nearest, avrg_furthest) schedule(static)
         for (int i = 0; i < nearests.size(); i++)
         {
             avrg_nearest += nearests[i];
@@ -397,9 +387,10 @@ int main(int argc, char **argv)
     std::string schedule_method = argv[3];
 
     // Check if first cmd argument is file path or integer
-    if (!isPath(std::to_string(atoi(argv[1]))))
+    if (isNotPath(argv[1]))
     { // If arg is int (not path)
         // Sets size of points vector based on command line argument
+        std::cout << "Generating Random Points" << std::endl;
         size = atoi(argv[1]);
         // Start generating points and benchmark performance
         auto start_generating = std::chrono::high_resolution_clock::now();
@@ -413,6 +404,7 @@ int main(int argc, char **argv)
     else
     {
         // Start reading file of points and benchmark performance
+        std::cout << "reading from file" << std::endl;
         auto start_generating = std::chrono::high_resolution_clock::now();
         points = make_points(argv[1]);
         auto stop_generating = std::chrono::high_resolution_clock::now();
@@ -472,6 +464,11 @@ int main(int argc, char **argv)
             }
             
         }
+    }
+    else
+    {
+        std::cerr << "3rd Argument can only be \"all\" or \"partitioned\"" << std::endl;
+        std::terminate();
     }
 
     // Stop benchmark performance
